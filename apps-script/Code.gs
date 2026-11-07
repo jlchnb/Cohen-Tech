@@ -2,8 +2,8 @@
  * Cohen Tech: reservas con Google Calendar + registro de consultas en Supabase.
  *
  * Qué hace:
- *  - doGet  → le dice a la página qué horas del día ya están ocupadas en tu calendario.
- *  - doPost → valida la hora contra tus turnos 4x4, crea el evento en tu calendario (invita al cliente
+ *  - doGet (action=busy) → le dice a la página qué horas del día ya están ocupadas en tu calendario.
+ *  - doGet (action=book)  → valida la hora contra tus turnos 4x4, crea el evento en tu calendario (invita al cliente
  *             por correo), guarda la consulta en Supabase y, si quieres, te avisa por correo.
  *
  * Publicación: Implementar > Nueva implementación > Aplicación web
@@ -35,14 +35,30 @@ var CONFIG = {
   }
 };
 
+/**
+ * La página usa GET para todo. Los navegadores bloquean (CORS) la respuesta de un POST a Apps Script,
+ * porque Google la redirige a otro dominio; con GET esa redirección funciona sin problema.
+ *   ?action=busy&date=AAAA-MM-DD    → horas ocupadas del día
+ *   ?action=book&data=<JSON>        → crea la reserva
+ */
 function doGet(e) {
   var p = (e && e.parameter) || {};
   if (p.action === 'busy' && isRealDate_(p.date)) {
     return json_({ ok: true, busy: busyForDay_(p.date) });
   }
+  if (p.action === 'book') {
+    var data;
+    try {
+      data = JSON.parse(p.data);
+    } catch (err) {
+      return json_({ ok: false, error: 'invalid' });
+    }
+    return handleBooking_(data);
+  }
   return json_({ ok: false, error: 'bad_request' });
 }
 
+// Se mantiene por compatibilidad (por ejemplo, para probar con herramientas como curl).
 function doPost(e) {
   var data;
   try {
@@ -50,9 +66,12 @@ function doPost(e) {
   } catch (err) {
     return json_({ ok: false, error: 'invalid' });
   }
+  return handleBooking_(data);
+}
 
+function handleBooking_(data) {
   // Campo trampa para bots: si viene lleno, fingimos éxito y no hacemos nada.
-  if (data.website) return json_({ ok: true });
+  if (data && data.website) return json_({ ok: true });
 
   if (!isValid_(data)) return json_({ ok: false, error: 'invalid' });
 

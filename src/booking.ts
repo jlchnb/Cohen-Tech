@@ -80,12 +80,12 @@ async function sendBooking(payload: BookingPayload): Promise<{ ok: boolean; erro
     await new Promise((resolve) => window.setTimeout(resolve, 900));
     return { ok: true };
   }
-  // text/plain evita la solicitud previa (preflight) que Apps Script no responde.
-  const response = await fetch(CONFIG.appsScriptUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload),
-  });
+  // Se envía por GET: los navegadores bloquean la respuesta de un POST a Apps Script (CORS tras la redirección de Google).
+  const url = new URL(CONFIG.appsScriptUrl);
+  url.searchParams.set('action', 'book');
+  url.searchParams.set('data', JSON.stringify(payload));
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return (await response.json()) as { ok: boolean; error?: string };
 }
 

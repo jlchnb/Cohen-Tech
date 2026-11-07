@@ -232,17 +232,17 @@
               <div class="mt-4 grid gap-4 sm:grid-cols-2">
                 <div class="field sm:col-span-2" data-field="name">
                   <label for="f-name">Nombre</label>
-                  <input id="f-name" name="name" type="text" autocomplete="name" class="input" aria-describedby="err-name" />
+                  <input id="f-name" maxlength="80" name="name" type="text" autocomplete="name" class="input" aria-describedby="err-name" />
                   <p id="err-name" class="field-error" hidden></p>
                 </div>
                 <div class="field" data-field="email">
                   <label for="f-email">Correo</label>
-                  <input id="f-email" name="email" type="email" autocomplete="email" inputmode="email" class="input" aria-describedby="err-email" />
+                  <input id="f-email" maxlength="120" name="email" type="email" autocomplete="email" inputmode="email" class="input" aria-describedby="err-email" />
                   <p id="err-email" class="field-error" hidden></p>
                 </div>
                 <div class="field" data-field="phone">
                   <label for="f-phone">Número de contacto</label>
-                  <input id="f-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+56 9 1234 5678" class="input" aria-describedby="err-phone" />
+                  <input id="f-phone" maxlength="30" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+56 9 1234 5678" class="input" aria-describedby="err-phone" />
                   <p id="err-phone" class="field-error" hidden></p>
                 </div>
               </div>
@@ -257,12 +257,12 @@
               <div class="mt-4 grid gap-4">
                 <div class="field" data-field="model">
                   <label for="f-model">Marca y modelo</label>
-                  <input id="f-model" name="model" type="text" placeholder="Ej: Lenovo IdeaPad 3, o PC armado con Ryzen 5" class="input" aria-describedby="err-model" />
+                  <input id="f-model" maxlength="100" name="model" type="text" placeholder="Ej: Lenovo IdeaPad 3, o PC armado con Ryzen 5" class="input" aria-describedby="err-model" />
                   <p id="err-model" class="field-error" hidden></p>
                 </div>
                 <div class="field" data-field="details">
                   <label for="f-details">Qué servicio necesitas</label>
-                  <textarea id="f-details" name="details" rows="5" placeholder="Cuéntanos qué le pasa o qué quieres que le hagamos. Mientras más detalle, mejor." class="input resize-y" aria-describedby="err-details"></textarea>
+                  <textarea id="f-details" name="details" rows="5" maxlength="600" placeholder="Cuéntanos qué le pasa o qué quieres que le hagamos. Mientras más detalle, mejor." class="input resize-y" aria-describedby="err-details"></textarea>
                   <p id="err-details" class="field-error" hidden></p>
                 </div>
               </div>
