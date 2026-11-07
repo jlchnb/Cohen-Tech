@@ -213,7 +213,17 @@
           <div class="booking-card">
             <form id="booking-form" novalidate>
               <h3 class="font-display text-xl font-bold">Día y hora</h3>
-              <div id="day-strip" class="day-strip" role="radiogroup" aria-label="Día de la visita"></div>
+              <div class="cal">
+                <div class="cal-head" aria-hidden="true">
+                  <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
+                </div>
+                <div id="day-grid" class="cal-grid" role="radiogroup" aria-label="Día de la visita"></div>
+                <ul class="cal-legend">
+                  <li><span class="cal-swatch" data-kind="full"></span>Libre todo el día</li>
+                  <li><span class="cal-swatch" data-kind="partial"></span>Horario reducido</li>
+                  <li><span class="cal-swatch" data-kind="closed"></span>No disponible</li>
+                </ul>
+              </div>
               <div id="slot-grid" class="slot-grid" role="radiogroup" aria-label="Hora de la visita"></div>
               <p id="slot-status" class="mt-3 min-h-6 text-sm text-ink/75" aria-live="polite">Elige un día para ver las horas disponibles.</p>
               <p id="slot-error" class="field-error" role="alert" hidden></p>

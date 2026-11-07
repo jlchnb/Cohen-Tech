@@ -1,4 +1,5 @@
 import { CONFIG } from './config';
+import { getAvailability, type DayAvailability } from './schedule';
 import { bindPress, celebrate, popIn, popInMany, shake } from './animations';
 
 interface Busy {
@@ -50,7 +51,6 @@ const fromKey = (key: string): Date => {
 };
 const formatMinutes = (min: number): string => `${pad(Math.floor(min / 60))}:${pad(min % 60)}`;
 
-const weekdayShort = new Intl.DateTimeFormat('es-CL', { weekday: 'short' });
 const monthShort = new Intl.DateTimeFormat('es-CL', { month: 'short' });
 const longDate = new Intl.DateTimeFormat('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -104,7 +104,7 @@ function calendarLink(payload: BookingPayload): string {
 
 export function initBooking(): void {
   const form = $<HTMLFormElement>('#booking-form');
-  const dayStrip = $<HTMLElement>('#day-strip');
+  const dayGrid = $<HTMLElement>('#day-grid');
   const slotGrid = $<HTMLElement>('#slot-grid');
   const slotStatus = $<HTMLElement>('#slot-status');
   const slotError = $<HTMLElement>('#slot-error');
@@ -141,32 +141,52 @@ export function initBooking(): void {
     });
   });
 
-  /* ---------- Días ---------- */
-  function renderDays(): void {
+  /* ---------- Calendario de disponibilidad ---------- */
+  function renderCalendar(): void {
     const today = new Date();
-    for (let i = 0; i < CONFIG.daysAhead; i += 1) {
-      const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
-      if (!(CONFIG.workDays as readonly number[]).includes(date.getDay())) continue;
+    const todayKey = toKey(today);
+    // El calendario empieza el lunes de esta semana.
+    const mondayOffset = (today.getDay() + 6) % 7;
+    const first = new Date(today.getFullYear(), today.getMonth(), today.getDate() - mondayOffset);
+    const cells: HTMLButtonElement[] = [];
+
+    for (let i = 0; i < CONFIG.calendarWeeks * 7; i += 1) {
+      const date = new Date(first.getFullYear(), first.getMonth(), first.getDate() + i);
       const key = toKey(date);
+      const past = key < todayKey;
+      const info = past ? null : getAvailability(key);
+      const unavailable = past || info?.kind === 'closed';
+
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'day';
+      button.className = 'cal-day';
       button.dataset.date = key;
+      button.dataset.kind = past ? 'past' : (info?.kind ?? 'closed');
       button.setAttribute('role', 'radio');
       button.setAttribute('aria-checked', 'false');
-      button.setAttribute('aria-label', longDate.format(date));
-      button.innerHTML = `<small>${weekdayShort.format(date).replace('.', '')}</small><strong>${date.getDate()}</strong><small>${monthShort.format(date).replace('.', '')}</small>`;
-      button.addEventListener('click', () => selectDate(key));
-      bindPress(button);
-      dayStrip.append(button);
+
+      const label = longDate.format(date);
+      if (unavailable) {
+        button.disabled = true;
+        button.setAttribute('aria-label', `${label}, no disponible`);
+      } else {
+        button.setAttribute('aria-label', info?.kind === 'partial' ? `${label}, horario reducido` : label);
+        button.addEventListener('click', () => selectDate(key));
+        bindPress(button);
+      }
+
+      const month = i === 0 || date.getDate() === 1 ? `<small>${monthShort.format(date).replace('.', '')}</small>` : '';
+      button.innerHTML = `${month}<strong>${date.getDate()}</strong>`;
+      cells.push(button);
     }
+    dayGrid.replaceChildren(...cells);
   }
 
   function selectDate(key: string): void {
     selectedDate = key;
     selectedTime = null;
     clearSlotError();
-    dayStrip.querySelectorAll<HTMLElement>('.day').forEach((day) => {
+    dayGrid.querySelectorAll<HTMLElement>('.cal-day').forEach((day) => {
       const active = day.dataset.date === key;
       day.setAttribute('aria-checked', String(active));
       if (active) popIn(day);
@@ -183,7 +203,7 @@ export function initBooking(): void {
     try {
       const busy = await fetchBusy(key);
       if (id !== requestId) return;
-      renderSlots(key, busy);
+      renderSlots(key, busy, getAvailability(key));
     } catch {
       if (id !== requestId) return;
       slotStatus.textContent = 'No pudimos cargar las horas. Recarga la página o escríbenos por WhatsApp.';
@@ -192,15 +212,17 @@ export function initBooking(): void {
     }
   }
 
-  function renderSlots(key: string, busy: Busy[]): void {
+  function renderSlots(key: string, busy: Busy[], day: DayAvailability): void {
     const now = new Date();
     const isToday = key === toKey(now);
     const earliestToday = now.getHours() * 60 + now.getMinutes() + CONFIG.minNoticeHours * 60;
     const buttons: HTMLButtonElement[] = [];
     let available = 0;
 
+    // Las horas se cuentan desde la apertura; solo se muestran las que caen dentro de tus tiempos disponibles ese día.
     for (let start = CONFIG.openHour * 60; start + CONFIG.slotMinutes <= CONFIG.closeHour * 60; start += CONFIG.slotMinutes) {
       const end = start + CONFIG.slotMinutes;
+      if (start < day.from || end > day.to) continue;
       const taken = busy.some((b) => start < b.end && end > b.start) || (isToday && start < earliestToday);
       const time = formatMinutes(start);
       const button = document.createElement('button');
@@ -223,7 +245,8 @@ export function initBooking(): void {
 
     slotGrid.replaceChildren(...buttons);
     popInMany(buttons);
-    slotStatus.textContent = available > 0 ? 'Elige una hora.' : 'No quedan horas libres ese día. Prueba con otro.';
+    const notice = day.note ? `${day.note} ` : '';
+    slotStatus.textContent = available > 0 ? `${notice}Elige una hora.` : `${notice}No quedan horas libres ese día. Prueba con otro.`;
   }
 
   function selectTime(time: string): void {
@@ -239,7 +262,7 @@ export function initBooking(): void {
   function showSlotError(message: string): void {
     slotError.textContent = message;
     slotError.hidden = false;
-    shake(dayStrip);
+    shake(dayGrid);
   }
   function clearSlotError(): void {
     slotError.hidden = true;
@@ -271,7 +294,7 @@ export function initBooking(): void {
 
     if (!selectedDate || !selectedTime) {
       showSlotError('Elige un día y una hora.');
-      firstInvalid = dayStrip.querySelector<HTMLElement>('.day');
+      firstInvalid = dayGrid.querySelector<HTMLElement>('.cal-day:not(:disabled)');
     }
 
     for (const name of fieldNames) {
@@ -328,6 +351,10 @@ export function initBooking(): void {
         showFormError('Esa hora acaba de ser tomada. Elige otra y confirma de nuevo.');
         selectedTime = null;
         void loadSlots(payload.date);
+      } else if (result.error === 'unavailable' || result.error === 'past') {
+        showFormError('Esa hora ya no está disponible. Elige otra y confirma de nuevo.');
+        selectedTime = null;
+        void loadSlots(payload.date);
       } else if (result.error === 'invalid') {
         showFormError('Revisa los datos del formulario e inténtalo de nuevo.');
       } else {
@@ -363,5 +390,5 @@ export function initBooking(): void {
   });
 
   bindPress($('#add-to-calendar'));
-  renderDays();
+  renderCalendar();
 }
