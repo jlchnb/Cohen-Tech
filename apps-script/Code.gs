@@ -97,7 +97,8 @@ function handleBooking_(data) {
   // y los datos siguen en la descripción del evento del calendario.
   var saved = saveInquiry_(data, booking);
   notifyOwner_(data, booking, saved);
-  return json_({ ok: true });
+  // "db" le dice a la página si la consulta quedó en Supabase ('ok') o por qué no (se ve en la consola del navegador).
+  return json_({ ok: true, db: saved.ok ? 'ok' : saved.reason });
 }
 
 /* ---------- Reserva ---------- */
@@ -156,7 +157,10 @@ function saveInquiry_(data, booking) {
   var props = PropertiesService.getScriptProperties();
   var url = props.getProperty('SUPABASE_URL');
   var key = props.getProperty('SUPABASE_KEY');
-  if (!url || !key) return { ok: false, skipped: true };
+  if (!url || !key) {
+    console.error('Faltan las propiedades SUPABASE_URL y/o SUPABASE_KEY en Configuración del proyecto > Propiedades del script.');
+    return { ok: false, reason: 'sin_configurar' };
+  }
 
   var row = {
     nombre: clean_(data.name, 80),
@@ -172,32 +176,41 @@ function saveInquiry_(data, booking) {
     evento_calendar_id: booking.eventId
   };
 
-  // Las claves nuevas (sb_secret_...) van solo en "apikey"; las antiguas (JWT, empiezan con eyJ) también como Bearer.
-  var headers = { apikey: key, Prefer: 'return=minimal' };
-  if (key.indexOf('eyJ') === 0) headers.Authorization = 'Bearer ' + key;
-
   try {
-    var response = UrlFetchApp.fetch(url.replace(/\/+$/, '') + '/rest/v1/consultas', {
+    var response = UrlFetchApp.fetch(supabaseBase_(url) + '/rest/v1/consultas', {
       method: 'post',
       contentType: 'application/json',
-      headers: headers,
+      headers: supabaseHeaders_(key, { Prefer: 'return=minimal' }),
       payload: JSON.stringify(row),
       muteHttpExceptions: true
     });
     var code = response.getResponseCode();
     if (code >= 200 && code < 300) return { ok: true };
     console.error('Supabase respondió ' + code + ': ' + response.getContentText());
-    return { ok: false };
+    return { ok: false, reason: 'http_' + code };
   } catch (err) {
     console.error(err);
-    return { ok: false };
+    // Si Google nunca autorizó las conexiones externas, el error menciona los permisos.
+    return { ok: false, reason: /permission|authoriz/i.test(String(err)) ? 'sin_permiso' : 'error_de_red' };
   }
+}
+
+// Las claves nuevas (sb_secret_...) van solo en "apikey"; las antiguas (JWT, empiezan con eyJ) también como Bearer.
+function supabaseHeaders_(key, extra) {
+  var headers = { apikey: key };
+  if (key.indexOf('eyJ') === 0) headers.Authorization = 'Bearer ' + key;
+  for (var name in extra) headers[name] = extra[name];
+  return headers;
+}
+
+function supabaseBase_(url) {
+  return url.replace(/\/+$/, '');
 }
 
 function notifyOwner_(data, booking, saved) {
   if (!CONFIG.OWNER_EMAIL) return;
   try {
-    var warning = saved.ok || saved.skipped ? '' : '\n\nAVISO: no se pudo guardar en Supabase. Revisa Ejecuciones en Apps Script.';
+    var warning = saved.ok ? '' : '\n\nAVISO: no se guardó en Supabase (' + saved.reason + '). Ejecuta testSupabase en Apps Script para ver el motivo.';
     MailApp.sendEmail(
       CONFIG.OWNER_EMAIL,
       'Nueva reserva: ' + data.date + ' ' + data.time,
@@ -206,6 +219,31 @@ function notifyOwner_(data, booking, saved) {
   } catch (err) {
     console.error(err);
   }
+}
+
+/**
+ * PRUEBA: ejecútala desde el editor de Apps Script (selecciona "testSupabase" arriba y toca Ejecutar).
+ * La primera vez Google te pedirá autorizar la conexión a servicios externos: acepta.
+ * Luego mira el "Registro de ejecución" de abajo: te dice si todo está bien o qué falta. No guarda nada.
+ */
+function testSupabase() {
+  var props = PropertiesService.getScriptProperties();
+  var url = props.getProperty('SUPABASE_URL');
+  var key = props.getProperty('SUPABASE_KEY');
+  if (!url || !key) {
+    console.log('FALTA: agrega SUPABASE_URL y SUPABASE_KEY en Configuración del proyecto > Propiedades del script.');
+    return;
+  }
+  var response = UrlFetchApp.fetch(supabaseBase_(url) + '/rest/v1/consultas?select=id&limit=1', {
+    method: 'get',
+    headers: supabaseHeaders_(key, {}),
+    muteHttpExceptions: true
+  });
+  var code = response.getResponseCode();
+  if (code === 200) console.log('TODO BIEN: la URL, la clave y la tabla "consultas" funcionan.');
+  else if (code === 401 || code === 403) console.log('CLAVE INCORRECTA (' + code + '): usa la clave SECRETA (sb_secret_... o service_role), no la pública.');
+  else if (code === 404) console.log('NO ENCUENTRO LA TABLA (404): revisa SUPABASE_URL y que la tabla se llame "consultas".');
+  else console.log('Supabase respondió ' + code + ': ' + response.getContentText());
 }
 
 /* ---------- Tus tiempos disponibles (espejo de src/schedule.ts) ---------- */

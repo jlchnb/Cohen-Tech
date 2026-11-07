@@ -75,7 +75,7 @@ async function fetchBusy(key: string): Promise<Busy[]> {
   return data.busy;
 }
 
-async function sendBooking(payload: BookingPayload): Promise<{ ok: boolean; error?: string }> {
+async function sendBooking(payload: BookingPayload): Promise<{ ok: boolean; error?: string; db?: string }> {
   if (!CONFIG.appsScriptUrl) {
     await new Promise((resolve) => window.setTimeout(resolve, 900));
     return { ok: true };
@@ -86,7 +86,7 @@ async function sendBooking(payload: BookingPayload): Promise<{ ok: boolean; erro
   url.searchParams.set('data', JSON.stringify(payload));
   const response = await fetch(url);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return (await response.json()) as { ok: boolean; error?: string };
+  return (await response.json()) as { ok: boolean; error?: string; db?: string };
 }
 
 function calendarLink(payload: BookingPayload): string {
@@ -100,6 +100,24 @@ function calendarLink(payload: BookingPayload): string {
   url.searchParams.set('ctz', CONFIG.timezone);
   url.searchParams.set('details', payload.details);
   return url.toString();
+}
+
+/** Avisa en la consola del navegador si la consulta quedó guardada en Supabase y, si no, qué falta. */
+function logDatabaseResult(db: string | undefined): void {
+  if (db === undefined) return; // modo de prueba, sin Apps Script
+  if (db === 'ok') {
+    console.info('[Cohen Tech] Reserva creada en Google Calendar y guardada en Supabase.');
+    return;
+  }
+  const hints: Record<string, string> = {
+    sin_configurar: 'faltan SUPABASE_URL y/o SUPABASE_KEY en las propiedades del script de Google.',
+    sin_permiso: 'falta autorizar las conexiones externas: ejecuta testSupabase en el editor de Apps Script.',
+    http_400: 'la tabla consultas no coincide con las columnas que envía el script.',
+    http_401: 'SUPABASE_KEY no es válida: usa la clave secreta (sb_secret_...), no la pública.',
+    http_403: 'SUPABASE_KEY no es válida: usa la clave secreta (sb_secret_...), no la pública.',
+    http_404: 'SUPABASE_URL incorrecta o no existe la tabla consultas.',
+  };
+  console.warn(`[Cohen Tech] La reserva quedó en Google Calendar, pero NO se guardó en Supabase (${db}): ${hints[db] ?? 'revisa Ejecuciones en Apps Script.'}`);
 }
 
 export function initBooking(): void {
@@ -346,6 +364,7 @@ export function initBooking(): void {
     try {
       const result = await sendBooking(payload);
       if (result.ok) {
+        logDatabaseResult(result.db);
         showSuccess(payload);
       } else if (result.error === 'slot_taken') {
         showFormError('Esa hora acaba de ser tomada. Elige otra y confirma de nuevo.');
