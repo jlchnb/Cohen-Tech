@@ -43,7 +43,7 @@ Cada reserva se guarda como una fila en la tabla `consultas` (nombre, correo, te
 
 La tabla queda cerrada al público (RLS activado, sin políticas): solo el script puede escribir en ella. Tú ves y editas las filas desde **Table Editor** de Supabase y puedes cambiar el `estado` de cada una (agendada, en revisión, en reparación, lista, entregada, cancelada).
 
-**Si la reserva llega al calendario pero no a Supabase:** abre la consola del navegador (F12) al reservar; la página indica el motivo. Para confirmarlo desde Google, abre el editor de Apps Script, elige la función `testSupabase` y toca Ejecutar (la primera vez pide autorizar conexiones externas). El registro de ejecución dice si falta una propiedad, si la clave es incorrecta o si no encuentra la tabla.
+**Si la reserva llega al calendario pero no a Supabase:** abre la consola del navegador (F12) al reservar; la página indica el motivo. Para saber qué versión del script está publicada, abre tu URL `/exec` con `?action=status` al final: debe mostrar `"version":"2026-11-07-c"` (o más nueva) y `"supabase":true`. Si no, falta publicar una nueva versión de la implementación o agregar las propiedades. Para confirmarlo desde Google, abre el editor de Apps Script, elige la función `testSupabase` y toca Ejecutar (la primera vez pide autorizar conexiones externas). El registro de ejecución dice si falta una propiedad, si la clave es incorrecta o si no encuentra la tabla.
 
 Si Supabase fallara en una reserva, la hora igual queda en tu calendario con todos los datos en la descripción, y con `OWNER_EMAIL` configurado te llega un aviso.
 

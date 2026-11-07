@@ -14,6 +14,9 @@
  *   SUPABASE_KEY = tu clave secreta (secret / service_role)
  */
 
+// Sube este número cuando cambies el código, para comprobar que Google publicó la versión nueva (?action=status).
+var SCRIPT_VERSION = '2026-11-07-c';
+
 var CONFIG = {
   BUSINESS_NAME: 'Cohen Tech',
   CALENDAR_ID: 'primary', // 'primary' = tu calendario principal. Puedes usar el ID de otro calendario.
@@ -38,6 +41,7 @@ var CONFIG = {
 /**
  * La página usa GET para todo. Los navegadores bloquean (CORS) la respuesta de un POST a Apps Script,
  * porque Google la redirige a otro dominio; con GET esa redirección funciona sin problema.
+ *   ?action=status                  → versión publicada y si Supabase está configurado
  *   ?action=busy&date=AAAA-MM-DD    → horas ocupadas del día
  *   ?action=book&data=<JSON>        → crea la reserva
  */
@@ -45,6 +49,15 @@ function doGet(e) {
   var p = (e && e.parameter) || {};
   if (p.action === 'busy' && isRealDate_(p.date)) {
     return json_({ ok: true, busy: busyForDay_(p.date) });
+  }
+  if (p.action === 'status') {
+    // Para comprobar desde el navegador qué versión está publicada y si las claves de Supabase están cargadas.
+    var props = PropertiesService.getScriptProperties();
+    return json_({
+      ok: true,
+      version: SCRIPT_VERSION,
+      supabase: Boolean(props.getProperty('SUPABASE_URL') && props.getProperty('SUPABASE_KEY'))
+    });
   }
   if (p.action === 'book') {
     var data;

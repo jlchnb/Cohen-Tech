@@ -104,7 +104,15 @@ function calendarLink(payload: BookingPayload): string {
 
 /** Avisa en la consola del navegador si la consulta quedó guardada en Supabase y, si no, qué falta. */
 function logDatabaseResult(db: string | undefined): void {
-  if (db === undefined) return; // modo de prueba, sin Apps Script
+  if (!CONFIG.appsScriptUrl) return; // modo de prueba, sin Apps Script
+  if (db === undefined) {
+    console.warn(
+      '[Cohen Tech] El script de Google publicado es una versión antigua (no informa del guardado en Supabase). ' +
+        'En Apps Script: Implementar > Administrar implementaciones > lápiz > Nueva versión > Implementar. ' +
+        'Para comprobarlo, abre tu URL /exec con ?action=status al final.',
+    );
+    return;
+  }
   if (db === 'ok') {
     console.info('[Cohen Tech] Reserva creada en Google Calendar y guardada en Supabase.');
     return;
